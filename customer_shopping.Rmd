@@ -1,0 +1,632 @@
+```{r}
+library(skimr)
+library(glmnet)
+library(rsample)
+library(MASS)
+```
+
+
+# Read data set and save into data frame
+```{r}
+customer_shopping_df <- read.csv("datasets/customer_shopping_data_1695379411426.csv")
+```
+
+# Inspecting customer_shopping data
+```{r}
+summary(customer_shopping_df)
+```
+```{r}
+skim(customer_shopping_df)
+```
+# Creating a new dataframe 
+```{r}
+cust_shopping_num_df <- customer_shopping_df
+```
+
+
+# Convert non numerical values to numerical
+
+## Convert Gender to numerical values
+```{r}
+print(unique(cust_shopping_num_df$gender))
+```
+
+```{r}
+cust_shopping_num_df$gender <- as.numeric(factor(cust_shopping_num_df$gender, levels = unique(cust_shopping_num_df$gender)))
+head(cust_shopping_num_df)
+```
+## Convert Category to numerical values
+
+```{r}
+print(unique(cust_shopping_num_df$category))
+```
+
+```{r}
+cust_shopping_num_df$category <- as.numeric(factor(cust_shopping_num_df$category, levels = unique(cust_shopping_num_df$category)))
+head(cust_shopping_num_df)
+```
+
+## Convert payment_method to numerical values
+```{r}
+print(unique(cust_shopping_num_df$payment_method))
+```
+```{r}
+cust_shopping_num_df$payment_method <- as.numeric(factor(cust_shopping_num_df$payment_method, levels = unique(cust_shopping_num_df$payment_method)))
+head(cust_shopping_num_df)
+```
+
+## Convert shopping_mall to numerical values
+```{r}
+print(unique(cust_shopping_num_df$shopping_mall))
+```
+
+```{r}
+cust_shopping_num_df$shopping_mall <- as.numeric(factor(cust_shopping_num_df$shopping_mall, levels = unique(cust_shopping_num_df$shopping_mall)))
+head(cust_shopping_num_df)
+```
+
+# Convert invoice_date into date values
+
+```{r}
+class(cust_shopping_num_df$invoice_date)
+```
+
+```{r}
+cust_shopping_num_df$invoice_date <- as.Date(cust_shopping_num_df$invoice_date, format="%d/%m/%Y")
+head(cust_shopping_num_df)
+```
+
+# Task 1: Preliminary data analysis
+# Task 1.1 Time series plots (of input and output of customer shopping data)
+
+## Plot Time series of input (X)
+
+### Define input(X values) variables (excluding certain columns)
+
+```{r}
+exclude_columns <- names(cust_shopping_num_df)[!(names(cust_shopping_num_df) %in% c("invoice_no", "customer_id", "gender", "quantity", "invoice_date", "shopping_mall"))]
+```
+
+### X will hold required input(X) columns
+```{r}
+x <- cust_shopping_num_df[, exclude_columns]
+head(x)
+```
+
+### Create a time series object for input data (X) with monthly frequency (assuming data is monthly)
+```{r}
+start_date <- as.Date(min(cust_shopping_num_df$invoice_date))
+end_date <- as.Date(max(cust_shopping_num_df$invoice_date))
+```
+
+```{r}
+x_ts <- ts(x,
+           start = c(as.numeric(format(start_date, "%Y")), as.numeric(format(start_date, "%m"))),
+           end = c(as.numeric(format(end_date, "%Y")), as.numeric(format(end_date, "%m"))),
+           frequency = 12)
+```
+
+### Plot Time series for input(X Values)
+```{r}
+plot(x_ts, main = "Time series plot of Input (X)",
+     xlab = "Invoice Date", ylab = "Value")
+```
+
+
+## Plot Time series of output (Y)
+
+### Extract output (y) variable
+```{r}
+y <- cust_shopping_num_df$quantity
+```
+
+### Create a time series object for output data (Y) with monthly frequency (assuming data is monthly)
+```{r}
+y_ts <- ts(y,
+           start = c(as.numeric(format(start_date, "%Y")), as.numeric(format(start_date, "%m"))),
+           end = c(as.numeric(format(end_date, "%Y")), as.numeric(format(end_date, "%m"))),
+           frequency = 12)
+```
+
+### Plot the time series of output data (Y)
+```{r}
+plot(y_ts, main = "Time series plot of Output (Y)",
+     xlab = "Invoice Date", ylab = "Sales Quantity")
+```
+
+
+# Task 1.2 Distribution for each sales data
+
+## Density plot for age
+```{r}
+dis=density(x$age)
+plot(dis,main = "Density plot of age")
+
+# Creating a Histogram of X Inputs
+hist(x$age,freq = FALSE,main = "Histogram and density plot of age",col = "skyblue")
+
+#Adding density in the histogram
+lines(dis,lwd=2,col="black")
+rug(jitter(x$age))
+```
+
+## Density plot for category
+```{r}
+dis=density(x$category)
+plot(dis,main = "Density plot of category")
+
+# Creating a Histogram of X Inputs
+hist(x$category,freq = FALSE,main = "Histogram and density plot of category",col = "skyblue")
+
+#Adding density in the histogram
+lines(dis,lwd=2,col="black")
+rug(jitter(x$category))
+```
+
+## Density plot for price
+```{r}
+dis=density(x$price)
+plot(dis,main = "Density plot of price")
+
+# Creating a Histogram of X Inputs
+hist(x$price,freq = FALSE,main="Histogram and density plot of price",xlab = "Price",col = "skyblue")
+
+#Adding density in the histogram
+lines(dis,lwd=2,col="black")
+rug(jitter(x$price))
+```
+
+## Density plot for payment_method
+```{r}
+dis=density(x$payment_method)
+plot(dis,main = "Density plot of payment Method")
+
+# Creating a Histogram of X Inputs
+hist(x$payment_method,freq = FALSE,main="Histogram and density plot of payment Method",xlab = "Payment Method",col = "skyblue")
+
+#Adding density in the histogram
+lines(dis,lwd=2,col="black")
+rug(jitter(x$payment_method))
+```
+## Density plot for quantity
+```{r}
+dis=density(y)
+plot(dis,main = "Density plot of Quantity")
+
+# Creating a Histogram of X Inputs
+hist(y,freq = FALSE,main = "Histogram and density plot of Quantity",col = "skyblue")
+
+#Adding density in the histogram
+lines(dis,lwd=2,col="black")
+rug(jitter(x$quantity))
+```
+
+# Task 1.3 Correlation and scatter plots (between different input customer data and the output predicted sales quantity) to examine their dependencies
+
+```{r}
+# Plotting age against quantity
+
+plot(x$age,y,main = "Correlation betweeen age and quantity signal", xlab = "age", ylab = "quantity" )
+
+plot(x$price,y,main = "Correlation betweeen price and quantity signal", xlab = "price", ylab = "quantity" )
+
+plot(x$category,y,main = "Correlation betweeen category and quantity signal", xlab = "category", ylab = "quantity" )
+
+plot(x$payment_method,y,main = "Correlation betweeen payment_method and quantity signal", xlab = "payment_method", ylab = "quantity" )
+```
+```{r}
+x$quantity <- cust_shopping_num_df$quantity
+cor(x)
+```
+
+```{r}
+plot(x)
+```
+
+
+
+# Task 2: Regression – modeling the relationship between sales data
+# Task 2.1 Calculation of Theta Hat
+```{r}
+x$X1 <- x$age
+x$X2 <- x$category
+x$X3 <- x$price
+x$X4 <- x$payment_method
+```
+
+
+```{r}
+x <- x[, c("X1", "X2", "X3", "X4")]
+x <- as.matrix(x)
+y <- as.matrix(cust_shopping_num_df$quantity)
+```
+
+
+```{r}
+ones <- matrix(1, length(x)/4,1)
+```
+
+```{r}
+# Fit a ridge regression model
+alpha <- 0  # 0 for ridge regression
+lambda <- 1  # Adjust the lambda value as needed
+```
+
+## calculating theta of the model1
+```{r}
+y1 <- cbind(ones,(x[,"X4"]),(x[,"X1"])^2,(x[,"X1"])^3,(x[,"X2"])^4,(x[,"X1"])^4)
+ridge_model1 <- glmnet(y1, y, alpha = alpha, lambda = lambda)
+thetaHatModel1 = coefficients(ridge_model1)
+print(thetaHatModel1)
+```
+
+## calculating theta of the model2
+```{r}
+y2 <- cbind(ones,(x[,"X4"]),(x[,"X1"])^3,(x[,"X3"])^4)
+ridge_model2 <- glmnet(y2, y, alpha = alpha, lambda = lambda)
+thetaHatModel2 = coefficients(ridge_model2)
+print(thetaHatModel2)
+```
+
+## calculating theta of the model3
+```{r}
+y3 <- cbind(ones,(x[,"X3"])^3,(x[,"X3"])^4)
+ridge_model3 <- glmnet(y3, y, alpha = alpha, lambda = lambda)
+thetaHatModel3 = coefficients(ridge_model3)
+print(thetaHatModel3)
+```
+
+## calculating theta of the model4
+```{r}
+y4 <- cbind(ones,(x[,"X2"]),(x[,"X1"])^3,(x[,"X3"])^4)
+ridge_model4 <- glmnet(y4, y, alpha = alpha, lambda = lambda)
+thetaHatModel4 = coefficients(ridge_model4)
+print(thetaHatModel4)
+```
+
+## calculating theta of the model5
+```{r}
+y5 <- cbind(ones,(x[,"X4"]),(x[,"X1"])^2,(x[,"X1"])^3, (x[,"X3"]^4))
+ridge_model5 <- glmnet(y5, y, alpha = alpha, lambda = lambda)
+thetaHatModel5 = coefficients(ridge_model5)
+print(thetaHatModel5)
+```
+
+
+# Task 2.2 Model Residual Error
+## Model 1
+```{r}
+# Calculate predicted values for the ridge regression model
+Y_hat_ridge1 <- predict(ridge_model1, s = lambda, newx = y1)
+# Calculate residuals
+residuals_ridge <- y - Y_hat_ridge1
+# Calculate RSS for the ridge regression model
+RSS_ridge <- sum(residuals_ridge^2)
+# Extract coefficients for the specified lambda
+coefficients_ridge <- coef(ridge_model1, s =lambda)
+# Map coefficients to the corresponding columns of model1
+Y_hat_m1 <- as.matrix(y1) %*% coefficients_ridge[-1]  # Exclude the intercept term
+# Calculate RSS for Model 1
+residuals_m1 <- y - Y_hat_m1
+RSS_Model_1 <- sum(residuals_m1^2)
+print(RSS_Model_1)
+```
+
+## Model 2
+```{r}
+#model2
+Y_hat_ridge2 <- predict(ridge_model2, s = lambda, newx = y2)
+residuals_ridge <- y - Y_hat_ridge2
+RSS_ridge <- sum(residuals_ridge^2)
+coefficients_ridge <- coef(ridge_model2, s =lambda)
+Y_hat_m2 <- as.matrix(y2) %*% coefficients_ridge[-1]  
+residuals_m2 <- y - Y_hat_m2
+RSS_Model_2 <- sum(residuals_m2^2)
+print(RSS_Model_2)
+```
+
+## Model 3
+```{r}
+#model3
+Y_hat_ridge3 <- predict(ridge_model3, s = lambda, newx = y3)
+residuals_ridge <- y - Y_hat_ridge3
+RSS_ridge <- sum(residuals_ridge^2)
+coefficients_ridge <- coef(ridge_model3, s =lambda)
+Y_hat_m3 <- as.matrix(y3) %*% coefficients_ridge[-1]  
+residuals_m3 <- y - Y_hat_m3
+RSS_Model_3 <- sum(residuals_m3^2)
+print(RSS_Model_3)
+```
+
+## Model 4
+```{r}
+#model4
+Y_hat_ridge4 <- predict(ridge_model4, s = lambda, newx = y4)
+residuals_ridge <- y - Y_hat_ridge4
+RSS_ridge <- sum(residuals_ridge^2)
+coefficients_ridge <- coef(ridge_model4, s =lambda)
+Y_hat_m4 <- as.matrix(y4) %*% coefficients_ridge[-1]  
+residuals_m4 <- y - Y_hat_m4
+RSS_Model_4 <- sum(residuals_m4^2)
+print(RSS_Model_4)
+```
+
+## Model 5
+```{r}
+#model5
+Y_hat_ridge5 <- predict(ridge_model5, s = lambda, newx = y5)
+residuals_ridge <- y - Y_hat_ridge5
+RSS_ridge <- sum(residuals_ridge^2)
+coefficients_ridge <- coef(ridge_model5, s =lambda)
+Y_hat_m5 <- as.matrix(y5) %*% coefficients_ridge[-1]  
+residuals_m5 <- y - Y_hat_m5
+RSS_Model_5 <- sum(residuals_m5^2)
+print(RSS_Model_5)
+```
+
+
+# Task 2.3 Log Likelihood Function Evaluation
+## Likelibook for Model1
+```{r}
+N=length(y)
+#Calculating the Variance of Model 1
+Variance_model1=RSS_Model_1/(N-1)
+Variance_model1
+#Calculating the log-likelihood of Model 1
+likehood_Model_1 = -(N/2)*(log(2*pi))-(N/2)*(log(Variance_model1))-(1/(2*Variance_model1))*RSS_Model_1
+likehood_Model_1
+```
+
+## Likelibook for Model2
+```{r}
+Variance_model2=RSS_Model_2/(N-1)
+Variance_model2
+#Calculating the log-likelihood of Model 1
+likehood_Model_2 = -(N/2)*(log(2*pi))-(N/2)*(log(Variance_model2))-(1/(2*Variance_model2))*RSS_Model_2
+likehood_Model_2
+```
+
+## Likelibook for Model3
+```{r}
+Variance_model3=RSS_Model_3/(N-1)
+Variance_model3
+#Calculating the log-likelihood of Model 1
+likehood_Model_3 = -(N/2)*(log(2*pi))-(N/2)*(log(Variance_model3))-(1/(2*Variance_model3))*RSS_Model_3
+likehood_Model_3
+```
+
+## Likelibook for Model4
+```{r}
+Variance_model4=RSS_Model_2/(N-1)
+Variance_model4
+#Calculating the log-likelihood of Model 1
+likehood_Model_4 = -(N/2)*(log(2*pi))-(N/2)*(log(Variance_model4))-(1/(2*Variance_model4))*RSS_Model_4
+likehood_Model_4
+```
+
+## Likelibook for Model5
+```{r}
+Variance_model5=RSS_Model_5/(N-1)
+Variance_model5
+#Calculating the log-likelihood of Model 1
+likehood_Model_5 = -(N/2)*(log(2*pi))-(N/2)*(log(Variance_model5))-(1/(2*Variance_model5))*RSS_Model_5
+likehood_Model_5
+```
+
+
+# Task 2.4 Akaike Information Criterion (AIC) and Bayesian Information Criterion (BIC)
+
+##Calculating AIC and BIC of model 1
+```{r}
+K_model1<-length(thetaHatModel1)
+print(paste("K_model1: ",K_model1))
+AIC_model1=2*K_model1-2*likehood_Model_1
+print(paste("AIC_model1: ", AIC_model1))
+BIC_model1=K_model1*log(N)-2*likehood_Model_1
+print(paste("BIC_model1:", BIC_model1 ))
+```
+
+##Calculating AIC and BIC of model 2
+```{r}
+K_model2<-length(thetaHatModel2)
+print(paste("K_model2", K_model2))
+AIC_model2=2*K_model2-2*likehood_Model_2
+print(paste("AIC_model2:", AIC_model2)) 
+BIC_model2=K_model2*log(N)-2*likehood_Model_2
+print(paste("BIC_model2:", BIC_model2))
+```
+
+##Calculating AIC and BIC of model 3
+```{r}
+K_model3<-length(thetaHatModel3)
+print(paste("K_model3:", K_model3))
+AIC_model3=2*K_model3-2*likehood_Model_3
+print(paste("AIC_model3: ", AIC_model3))
+BIC_model3=K_model3*log(N)-2*likehood_Model_3
+print(paste("BIC_model3:", BIC_model3))
+```
+
+
+##Calculating AIC and BIC of model 4
+```{r}
+K_model4<-length(thetaHatModel4)
+print(paste("K_model4: ",K_model4))
+AIC_model4=2*K_model4-2*likehood_Model_4
+print(paste("AIC_model4:",AIC_model4))
+BIC_model4=K_model4*log(N)-2*likehood_Model_4
+print(paste("BIC_model4: ",BIC_model4))
+```
+
+
+##Calculating AIC and BIC of model 5
+```{r}
+K_model5<-length(thetaHatModel5)
+print(paste("K_model5: ",K_model5))
+AIC_model5=2*K_model5-2*likehood_Model_5
+print(paste("AIC_model5: ",AIC_model5))
+BIC_model5=K_model5*log(N)-2*likehood_Model_5
+print(paste("BIC_model5: ",BIC_model5))
+```
+
+
+# Task 2.5 model prediction errors
+
+## QQplot and QQ line of model 1
+```{r}
+model1_error <- y-Y_hat_m1
+## Plotting the graph 
+qqnorm(model1_error, col = "cyan",main = "QQ plot of model 1")
+qqline(model1_error, col = "red",lwd=1)
+```
+
+## QQplot and QQ line of model 2
+```{r}
+model2_error <- y-Y_hat_m2
+## Plotting the graph 
+qqnorm(model2_error, col = "darkblue",main = "QQ plot of model 2")
+qqline(model2_error, col = "red",lwd=1)
+```
+
+
+## QQplot and QQ line of model 3
+```{r}
+model3_error <- y-Y_hat_m3
+## Plotting the graph
+qqnorm(model3_error, col = "darkblue",main = "QQ plot of model 3")
+qqline(model3_error, col = "red",lwd=1)
+```
+
+## QQplot and QQ line of model 4
+```{r}
+model4_error <- y-Y_hat_m4
+## Plotting the graph
+qqnorm(model4_error, col = "darkblue",main = "QQ plot of model 4")
+qqline(model4_error, col = "red",lwd=1)
+```
+
+
+## QQplot and QQ line of model 5
+```{r}
+model5_error <- y-Y_hat_m5
+## Plotting the graph
+qqnorm(model5_error, col = "darkblue",main = "QQ plot of model 5")
+qqline(model5_error, col = "red",lwd=1)
+```
+
+# Task 2.7 Split the data into training and testing sets (70% training, 30% testing)
+```{r}
+set.seed(123)  # Set seed for reproducibility
+split_X <- initial_split(data = as.data.frame(x), prop = 0.7)
+split_Y <- initial_split(data = as.data.frame(y), prop = 0.7)
+
+X_training_set <- training(split_X)
+X_testing_set <- testing(split_X)
+Y_training_set <- as.matrix(training(split_Y))
+Y_testing_set <- as.matrix(testing(split_Y))
+```
+
+## Create the design matrix for the selected 'best' model
+```{r}
+traning_ones <- matrix(1, nrow = nrow(X_training_set), ncol = 1)
+X_training_model <- cbind(traning_ones, X_training_set[,"X2"], (X_training_set[,"X1"])^3, (X_training_set[,"X3"])^4)
+```
+
+## Estimate model parameters using training data
+```{r}
+theta_hat <- ginv(t(X_training_model) %*% X_training_model) %*% t(X_training_model) %*% Y_training_set
+```
+
+## Create the design matrix for the testing data using the same model equation
+```{r}
+traning_ones_test <- matrix(1, nrow = nrow(X_testing_set), ncol = 1)
+X_testing_model <- cbind(traning_ones_test, X_testing_set[,"X2"], (X_testing_set[,"X1"])^3, (X_testing_set[,"X3"])^4)
+```
+
+## Compute model predictions on the testing data
+```{r}
+Y_testing_hat <- X_testing_model %*% theta_hat
+```
+
+## Calculate 95% confidence intervals for the model predictions
+```{r}
+z <- qnorm(0.975)  # Z-score for 95% confidence interval
+n_len <- nrow(X_testing_model)
+error <- Y_testing_set - Y_testing_hat
+valid_indices <- (error != 0)  # Check for non-zero error values
+```
+
+## Ensure that the values inside sqrt are non-negative using abs function
+```{r}
+C_I_1 <- ifelse(valid_indices, z * sqrt(abs(error * (1 - error)) / n_len), 0)
+C_I_2 <- ifelse(valid_indices, z * sqrt(abs(error * (1 + error)) / n_len), 0)
+```
+
+
+```{r}
+# Plotting
+plot(Y_testing_set, col = "red", pch = 19, xlab = "Index", ylab = "Y Value", main = "Model Predictions and 95% Confidence Intervals")
+points(Y_testing_hat, col = "blue", pch = 19)
+
+# Add error bars for 95% confidence intervals
+arrows(x0 = 1:n_len, y0 = Y_testing_hat - C_I_1, y1 = Y_testing_hat + C_I_2, angle = 90, code = 3, length = 0.1, col = "green")
+legend("topright", legend = c("Testing Data", "Model Predictions", "95% CI"), col = c("red", "blue", "green"), pch = 19, cex = 0.8)
+```
+
+# Task 3 Approximate Bayesian Computation (ABC)
+```{r}
+## Model 2 will be used, parameter are selected and kept constant.
+arr_1=0
+arr_2=0
+f_value=0
+s_value=0
+thetaHatModel2
+#values from thetahat
+thetabias <- 0.483065688 #selected parameter
+thetaone <-0.143578928 # selected parameter
+thetatwo <- 0.010038614 # constant value
+thetathree <- 0.001912836 # constant value
+
+
+Epison <- RSS_Model_2 * 2 ## fixing value of eplision
+num <- 100 #number of iteration
+##Calculating Y-hat for performing rejection ABC
+counter <- 0
+for (i in 1:num) {
+  range1 <- runif(1,-0.483065688,0.483065688) # calculating the range
+  range1
+  range2 <- runif(1,-0.143578928,0.143578928)
+  New_thetahat <- matrix(c(range1,range2,thetatwo,thetathree))
+  New_Y_Hat <- y2 %*% New_thetahat ## calculating new Y-hat
+  new_RSS <- sum((y-New_Y_Hat)^2)
+  new_RSS
+  if (new_RSS > Epison){
+    arr_1[i] <- range1
+    arr_2[i] <- range2
+    counter = counter+1
+    f_value <- matrix(arr_1)
+    s_value <- matrix(arr_2)
+  }
+}
+hist(f_value)
+hist(s_value)
+```
+
+
+```{r}
+###ploting Joint and Marginal Posterior Distribution of the graph
+plot(f_value,s_value, col = c("brown", "blue"), main = "Joint and Marginal Posterior Distribution")
+par(mfrow=c(1,1))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
